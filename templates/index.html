@@ -1,0 +1,124 @@
+<!DOCCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<title>jwchat</title>
+<link rel="shortcut icon" type="image/png" href="/static/favicon.png"/>
+<script src="/static/jquery.min.js"></script>
+<script type="text/javascript" src="/static/caxl/jabberwerx.js"></script>
+<link href="/static/bootstrap.css" rel="stylesheet" type=text/css>
+<link href="/static/bootstrap-theme.css" rel="stylesheet" type=text/css>
+<script type="text/javascript">
+function makeid()
+{
+    var text = "";
+    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for( var i=0; i < 5; i++ )
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+
+    return text;
+};
+function readyFn( jQuery ){
+	var demoConfig = {
+	user:"{{user}}",
+	chat:"{{chat}}",
+	password:"{{password}}",
+	httpBindingURL: "{{bosh_url}}",
+	serviceDiscoveryEnabled: true,
+	unsecureAllowed: true 
+	};
+	jabberwerx._config.unsecureAllowed = demoConfig.unsecureAllowed;
+	jabberwerx._config.httpBindingURL = demoConfig.httpBindingURL;
+	jabberwerx._config.baseReconnectCountdown=1;
+
+	var client = new jabberwerx.Client('jwchat');
+	var control= new jabberwerx.MUCController(client);
+	var room=control.room(demoConfig.chat);
+	try {
+		var arg = {
+			//httpBindingURL: demoConfig.httpBindingURL,
+			successCallback: function success() {
+				this; //The client
+				},
+			errorCallback:  function(err) {
+				var tstr = jabberwerx.util.serializeXML(err);
+				jabberwerx.util.debug.warn(tstr);
+				jabberwerx.$("#log").text("Could not connect: " + tstr);
+				}
+			};
+			client.connect(demoConfig.user,demoConfig.password, arg);
+
+		} 
+	catch (ex) {
+		jabberwerx.util.debug.warn(ex.message);
+		jabberwerx.$("#log").text("Could not connect: " + ex.message);
+		};
+
+		
+	client.event("clientStatusChanged").bind(function(evt) {
+		if (evt.data.next == jabberwerx.Client.status_connected) {
+			jabberwerx.$("#log").prepend("Connected<br/>");
+			room.enter(demoConfig.user);
+		}else if (evt.data.next == jabberwerx.Client.status_disconnected) {
+			jabberwerx.$("#log").text("Disconnected. Reconnect on 10s. Hit F5 if reconnect fails.");
+			readyFn();
+		} else {
+			jabberwerx.$("#log").append("<br/>" + client.getClientStatusString(evt.data.next)+"<br/>Refresh page to reconnect.");
+		}
+	});
+	jabberwerx.$("#send").click(function () {
+		try {
+			var message=jabberwerx.$("#send_text").val();
+			room.sendBroadcast(message);
+			jabberwerx.$("#send_text").val('')
+			} 
+		catch (ex) {
+			jabberwerx.util.debug.warn("This is not a valid JID or node");
+			}
+	});
+	room.event("roomBroadcastReceived").bind(function(evt) {
+		var message = evt.data;
+		var body = message.getBody();
+		if (body) {
+			var message_ts=message.timestamp.getTime();
+				var user=(message.getFrom().split('/')[1]).split("@")[0];
+				var time_line=message.timestamp.getHours()+":"+message.timestamp.getMinutes()+":"+message.timestamp.getSeconds();
+				jabberwerx.$("#log").prepend(user+": "+ body +" @"+time_line+"<br/>");
+
+			}
+		});
+	$(window).bind("beforeunload", function() {
+		client.disconnect();
+	});
+	$( window ).unload(function() {
+		client.disconnect();
+	});
+}
+
+jabberwerx.$(document).ready(readyFn);
+</script>
+
+<link rel="stylesheet" href="/static/assets/css/reset.css"/>
+<link rel="stylesheet" href="/static/assets/css/sample.css"/>
+
+</head>
+<body>
+<div class="container theme-showcase" role="main">
+	<a href="/logout">Logout</a>
+<div class="col-md-12">
+<table align="center" class="table table-striped" >
+		<tr>
+			<td class="col-md-2">
+				<textarea id="send_text" rows="5" cols="40"></textarea>
+				<button id="send">Send</button><span></span>
+			</td>
+		
+			<td>
+				<div id="log">Loading</div>
+			</td>
+		</tr>
+</table>
+</div>
+</div>
+</body>
+</html>
